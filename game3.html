@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>🧽 הרובוט המנקה – זוויות צמודות</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div class="wrap">
+  <h1>🧽 הרובוט המנקה - משחק ללימוד זוויות צמודות</h1>
+  <p class="goal">מטרת המשחק: לשגר את הרובוט בזווית מדויקת כך שיפגע בלכלוכים הצהובים. בפעם הראשונה הלכלוך נצבע סגול, ורק אם חוזרים אליו בדיוק מהכיוון ההפוך בזווית הצמודה – הוא נעלם ומזכה בניקוד.</p>
+  <p>ניקוד: <span id="score">0</span></p>
+
+  <label class="block" for="dirtCount">כמה לכלוכים על הלוח?</label>
+  <input type="number" id="dirtCount" value="5" min="1">
+  <button class="start-button" id="startBtn">התחל משחק</button>
+
+  <label class="block" for="angle">בחרו את גודל הזווית:</label>
+  <input type="number" id="angle" value="0" min="0" max="180" placeholder="גודל זווית (0–180)">
+  <div>
+    <p style="font-weight:bold;margin-bottom:4px">בחרו את כיוון השיגור</p>
+    <label><input type="radio" name="direction" value="right" checked> ימינה</label>
+    <label style="margin-right:20px"><input type="radio" name="direction" value="left"> שמאלה</label>
+  </div>
+  <button class="shoot-button" id="shootBtn">שגר</button>
+
+  <div class="area-scroll"><div id="gameArea"></div></div>
+  <a class="back" href="index.html">← חזרה לרשימת המשחקים</a>
+</div>
+
+<div id="victory" class="victory-screen hidden">
+  <div class="victory-emoji">🎉🥳🎊</div>
+  <div>כל הכבוד! ניקית את כל הלכלוך!<br>ניקוד סופי: <span id="finalScore"></span></div>
+  <button class="start-button" id="againBtn">שחק שוב</button>
+</div>
+
+<script src="common.js"></script>
+<script>
+const area = document.getElementById("gameArea");
+const scoreEl = document.getElementById("score");
+let score = 0, robot, rx, ry, dirt = [], moving = false;
+
+function setScore(v) { score = v; scoreEl.textContent = score; }
+function placeRobot() { robot.style.left = rx + "px"; robot.style.top = ry + "px"; }
+const sameAngle = (a, b) => Math.abs(((a - b) % 360 + 360) % 360) < 0.01;
+
+function startGame() {
+  const raw = document.getElementById("dirtCount").value;
+  let count = parseInt(raw === "" ? "5" : raw);
+  if (isNaN(count) || count < 1) count = 5;
+  setScore(0);
+  moving = false;
+  document.getElementById("victory").classList.add("hidden");
+  area.innerHTML = "";
+  rx = CX; ry = CY;
+  drawAngleMap(area, 0, 180);
+  dirt = createDirt(area, count);
+  robot = el("", area); robot.id = "robot";
+  placeRobot();
+}
+
+function shoot() {
+  if (moving || !robot) return;
+  const angleDeg = parseFloat(document.getElementById("angle").value);
+  if (isNaN(angleDeg)) return;
+  const direction = document.querySelector('input[name="direction"]:checked').value;
+  setScore(score - 1);
+  // right: angle measured clockwise from up; left: mirrored (counter-clockwise)
+  const finalAngle = direction === "right" ? angleDeg : 360 - angleDeg;
+  const rad = (finalAngle - 90) * Math.PI / 180;
+  moving = true;
+
+  (function move() {
+    const nx = rx + Math.cos(rad) * SPEED, ny = ry + Math.sin(rad) * SPEED;
+    if (nx <= 0 || nx >= W || ny <= 0 || ny >= H) { moving = false; return; }
+    drawLine(area, "path", rx, ry, nx, ny);
+    rx = nx; ry = ny; placeRobot();
+
+    for (let i = dirt.length - 1; i >= 0; i--) {
+      const d = dirt[i];
+      if (Math.abs(rx - d.dataset.x) >= 15 || Math.abs(ry - d.dataset.y) >= 15) continue;
+      if (d.dataset.hit === "0") {
+        d.classList.add("dirt-hit");
+        d.dataset.hit = "1";
+        d.dataset.angle = finalAngle;
+        d.dataset.dir = direction;
+      } else {
+        const reverseAngle = (parseFloat(d.dataset.angle) + 180) % 360;
+        const reverseDir = d.dataset.dir === "right" ? "left" : "right";
+        if (sameAngle(finalAngle, reverseAngle) && direction === reverseDir) {
+          d.remove(); dirt.splice(i, 1); setScore(score + 15);
+        }
+      }
+    }
+    if (dirt.length === 0) {
+      moving = false;
+      document.getElementById("finalScore").textContent = score;
+      document.getElementById("victory").classList.remove("hidden");
+      return;
+    }
+    requestAnimationFrame(move);
+  })();
+}
+
+document.getElementById("startBtn").onclick = startGame;
+document.getElementById("againBtn").onclick = startGame;
+document.getElementById("shootBtn").onclick = shoot;
+document.getElementById("angle").addEventListener("keydown", e => { if (e.key === "Enter") shoot(); });
+startGame();
+</script>
+</body>
+</html>
